@@ -1,0 +1,237 @@
+/*
+ * Copyright (c) 2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#ifndef __EIP_TR_H
+#define __EIP_TR_H
+
+/*
+ * TODO: Set timeout equal to processing time for max queue reap.
+ */
+#define EIP_TR_INVAL_TIMEOUT msecs_to_jiffies(10)
+#define EIP_TR_SIZE (sizeof(struct eip_tr) + EIP_HW_CTX_SIZE_LARGE_BYTES + L1_CACHE_BYTES)
+#define EIP_TR_CTRL_CONTEXT_WORDS(x) (((x) & 0x3F) << 8)
+#define EIP_TR_REDIR_EN (0x1 << 11) /* Redirect enable */
+#define EIP_TR_REDIR_IFACE(i) (((i) & 0xF) << 12) /* Redirect destination interface */
+
+struct eip_svc_entry;
+typedef bool (*eip_tr_init_t) (struct eip_tr *tr, struct eip_tr_info *info, const struct eip_svc_entry *algo);
+
+/*
+ * IPsec specific Transform Record Field
+ */
+#define EIP_TR_CTRL_CONTEXT_WORDS(x) (((x) & 0x3F) << 8)
+#define EIP_TR_IPSEC_SPI (1 << 27)
+#define EIP_TR_IPSEC_SEQ_NUM (1 << 28)
+#define EIP_TR_IPSEC_EXT_SEQ_NUM(x) ((x) << 29)
+#define EIP_TR_IPSEC_CONTROL_IV(x) ((x) << 5)
+#define EIP_TR_IPSEC_IV_FORMAT(x) ((x) << 10)
+#define EIP_TR_IPSEC_SEQ_NUM_STORE (1 << 22)
+#define EIP_TR_IPSEC_PAD_TYPE (0x1 << 16)
+#define EIP_TR_IPSEC_NULL_PAD_TYPE (0x7 << 14)
+#define EIP_TR_IPSEC_IPHDR_PROC (0x1 << 19)
+#define EIP_TR_IPSEC_TTL(x) ((x) << 16)
+#define EIP_TR_IPSEC_ENCAP_TOKEN_VERIFY 0xd0060000
+#define EIP_TR_IPSEC_ENCAP_TOKEN_INST 0xe12e0800
+#define EIP_TR_IPSEC_ENCAP_ESN_TOKEN_INST 0xe2560800
+#define EIP_TR_IPSEC_ENCAP_TOKEN_INST_LEN(x) (((x) + 1) << 24)
+#define EIP_TR_IPSEC_ENCAP_TOKEN_HDR 0x420000
+#define EIP_TR_IPSEC_ENCAP_TOKEN_HDR_IV 0x4000000
+#define EIP_TR_IPSEC_IV_SIZE(x) (x)
+#define EIP_TR_IPSEC_ICV_SIZE(x) ((x) << 8)
+#define EIP_TR_IPSEC_OHDR_PROTO(x) ((x) << 16)
+#define EIP_TR_IPSEC_ESP_PROTO(x) ((x) << 24)
+#define EIP_TR_IPSEC_NATT_SPORT IPSEC_EIP197_NATT_SPORT
+#define EIP_TR_IPSEC_NATT_DPORT (IPSEC_EIP197_NATT_SPORT << 16)
+#define EIP_TR_IPSEC_SEQ_NUM_OFFSET(x) ((x) << 24)
+#define EIP_TR_IPSEC_SEQ_NUM_OFFSET_EN (1 << 30)
+#define EIP_TR_IPSEC_DF_COPY	0
+#define EIP_TR_IPSEC_DF_RESET	1
+#define EIP_TR_IPSEC_DF_SET	2
+#define EIP_TR_IPSEC_DF(x) ((x & 0x3) << 20)
+#define EIP_TR_IPSEC_DSCP(x) ((x) << 24)
+#define EIP_TR_IPSEC_DSCP_COPY_EN(x) ((x) << 22)
+#define EIP_TR_IPSEC_IPV6_EN (0x1 << 8)
+#define EIP_TR_IPSEC_DECAP_TOKEN_VERIFY 0xd0060000
+#define EIP_TR_IPSEC_DECAP_TOKEN_VERIFY_SEQ 0x8000000
+#define EIP_TR_IPSEC_DECAP_TOKEN_VERIFY_PAD 0x5000000
+#define EIP_TR_IPSEC_DECAP_TOKEN_VERIFY_HMAC 0x1000c
+#define EIP_TR_IPSEC_REPLAY_WINDOW_SZ_32 (1 << 8);
+#define EIP_TR_IPSEC_REPLAY_WINDOW_SZ_64 (2 << 8);
+#define EIP_TR_IPSEC_REPLAY_WINDOW_SZ_128 (4 << 8);
+#define EIP_TR_IPSEC_REPLAY_WINDOW_SZ_384 (12 << 8);
+#define EIP_TR_IPSEC_SEQ_NUM_MASK_32 (0x2 << 30)
+#define EIP_TR_IPSEC_SEQ_NUM_MASK_64 (0x1 << 30)
+#define EIP_TR_IPSEC_SEQ_NUM_MASK_128 (0x3 << 30)
+#define EIP_TR_IPSEC_SEQ_NUM_MASK_384 ((0x2 << 30) | (0x1 << 15))
+#define EIP_TR_IPSEC_DECAP_TOKEN_INST_SEQ_UPDATE(x) ((x) << 24)
+#define EIP_TR_IPSEC_EXT_SEQ_NUM_PROC(x) ((x) << 29)
+#define EIP_TR_IPSEC_DECAP_TOKEN_INST 0xe02e1800
+#define EIP_TR_IPSEC_DECAP_ESN_TOKEN_INST 0xe0561800
+#define EIP_TR_IPSEC_DECAP_TUNNEL_TOKEN_HDR 0x01020000
+#define EIP_TR_IPSEC_DECAP_TRANSPORT_TOKEN_HDR 0x01820000
+
+#define EIP_TR_IPSEC_OHDR_PROTO_BYPASS 0
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TUNNEL_ENC 2
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TUNNEL_DEC 4
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TRANSPORT_ENC 5
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TRANSPORT_DEC 6
+#define EIP_TR_IPSEC_OHDR_PROTO_V6_TUNNEL_ENC 7
+#define EIP_TR_IPSEC_OHDR_PROTO_V6_TUNNEL_DEC 8
+#define EIP_TR_IPSEC_OHDR_PROTO_V6_TRANSPORT_ENC 11
+#define EIP_TR_IPSEC_OHDR_PROTO_V6_TRANSPORT_DEC 12
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TUNNEL_NATT_ENC 22
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TUNNEL_NATT_DEC 24
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TRANSPORT_NATT_ENC 25
+#define EIP_TR_IPSEC_OHDR_PROTO_V4_TRANSPORT_NATT_DEC 26
+
+#define EIP_TR_IPSEC_PROTO_NONE 0
+#define EIP_TR_IPSEC_PROTO_OUT_CBC 1
+#define EIP_TR_IPSEC_PROTO_OUT_NULL_AUTH 2
+#define EIP_TR_IPSEC_PROTO_OUT_CTR 3
+#define EIP_TR_IPSEC_PROTO_OUT_CCM 4
+#define EIP_TR_IPSEC_PROTO_OUT_GCM 5
+#define EIP_TR_IPSEC_PROTO_OUT_GMAC 6
+#define EIP_TR_IPSEC_PROTO_IN_CBC 7
+#define EIP_TR_IPSEC_PROTO_IN_NULL_AUTH 8
+#define EIP_TR_IPSEC_PROTO_IN_CTR 9
+#define EIP_TR_IPSEC_PROTO_IN_CCM 10
+#define EIP_TR_IPSEC_PROTO_IN_GCM 11
+#define EIP_TR_IPSEC_PROTO_IN_GMAC 12
+
+/*
+ * eip_tr_stats
+ *	Statistics for each transform record.
+ */
+struct eip_tr_stats {
+	uint64_t tx_frags;	/* Total buffer fragments sent via this TR */
+	uint64_t tx_pkts;	/* Total buffer sent via this TR */
+	uint64_t tx_bytes;	/* Total bytes via this TR */
+	uint64_t rx_frags;	/* Total buffer fragments received via this TR */
+	uint64_t rx_pkts;	/* Total buffer received via this TR */
+	uint64_t rx_bytes;	/* Total bytes recieved via this TR */
+	uint64_t rx_error;	/* Total buffer received with HW error */
+};
+
+/*
+ * eip_tr_template
+ *	Template to hold callbacks.
+ */
+struct eip_tr_template {
+	eip_tk_fill_t tk_fill;		/* cached Token fill method */
+	eip_tr_callback_t cb;		/* completion callback to client */
+	eip_tr_err_callback_t err_cb;	/* completion with error callback to client */
+};
+
+/*
+ * eip_tr_crypto
+ *	Crypto specific information.
+ */
+struct eip_tr_crypto {
+	struct eip_tr_template enc;		/* Encode operation */
+	struct eip_tr_template dec;		/* Decode operation */
+	struct eip_tr_template auth;		/* Auth operation */
+	void *app_data;			/* Opaque to pass with callback */
+};
+
+/*
+ * eip_tr_ipsec
+ *	IPsec specific information.
+ */
+struct eip_tr_ipsec {
+	struct eip_tr_template op;	/* Transformation operation callback */
+	void *app_data;			/* Opaque to pass with callback */
+};
+
+/*
+ * eip_tr
+ *	Transformation record allocated by HW for each session.
+ */
+struct eip_tr {
+	struct list_head node;			/* Node under per context TR list */
+	atomic_t active;			/* TR active flag. */
+	struct eip_ctx *ctx;			/* Parent context */
+
+	union {
+		struct eip_tr_crypto crypto;	/* Crypto information */
+		struct eip_tr_ipsec ipsec;	/* IPsec information */
+	};
+
+	uint32_t tr_addr_type;			/* TR address with lower 2-bit representing type */
+	uint32_t ctrl_words[2];			/* Initial HW control word */
+	uint32_t bypass[4];			/* Hybrid DMA bypass data */
+	uint32_t nonce;				/* nonce passed during allocation */
+	uint32_t tr_flags;			/* Flags for TR */
+	uint16_t iv_len;			/* IV length for configured algo */
+	uint16_t digest_len;			/* HMAC length for configured algo */
+
+	struct eip_tr_stats __percpu *stats_pcpu;	/* Statistisc */
+	struct kref ref;			/* Reference incremented per packet */
+
+	enum eip_svc svc;			/* Service number */
+	uint32_t inval_dummy_buf;		/* Dummy 4 byte buffer for Invalidation. */
+	struct delayed_work inval_work;		/* Workqueue for Invalidation schedule */
+	struct eip_flow *flow;			/* Software flow object*/
+
+	uint32_t hw_words[] __attribute__((aligned (L1_CACHE_BYTES)));
+						/* Hardware record words. Aligned it to exact L1 cache line boundary */
+};
+
+const struct eip_svc_entry *eip_tr_skcipher_get_svc(void);
+size_t eip_tr_skcipher_get_svc_len(void);
+const struct eip_svc_entry *eip_tr_ahash_get_svc(void);
+size_t eip_tr_ahash_get_svc_len(void);
+const struct eip_svc_entry *eip_tr_aead_get_svc(void);
+size_t eip_tr_aead_get_svc_len(void);
+const struct eip_svc_entry *eip_tr_ipsec_get_svc(void);
+size_t eip_tr_ipsec_get_svc_len(void);
+
+bool eip_tr_ahash_key2digest(struct eip_tr *tr, struct eip_tr_info *info, const struct eip_svc_entry *algo);
+void eip_tr_get_stats(struct eip_tr *tr, struct eip_tr_stats *stats);
+void eip_tr_final(struct kref *kref);
+int eip_tr_classify_err(uint16_t cle_err, uint16_t tr_err);
+
+/*
+ * eip_tr_ref()
+ *	Increment transform record reference.
+ */
+static inline struct eip_tr *eip_tr_ref(struct eip_tr *tr)
+{
+	kref_get(&tr->ref);
+	return tr;
+}
+
+/*
+ * eip_tr_ref()
+ *	Increment transform record reference only if nonzero.
+ */
+static inline struct eip_tr *eip_tr_ref_unless_zero(struct eip_tr *tr)
+{
+	if (!kref_get_unless_zero(&tr->ref))
+		return NULL;
+
+	return tr;
+}
+
+/*
+ * eip_tr_deref()
+ *	Decrement transform record reference.
+ */
+static inline void eip_tr_deref(struct eip_tr *tr)
+{
+	kref_put(&tr->ref, eip_tr_final);
+}
+
+#endif /* __EIP_TR_H */

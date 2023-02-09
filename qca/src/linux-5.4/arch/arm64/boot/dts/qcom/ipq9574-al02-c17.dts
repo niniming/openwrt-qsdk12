@@ -1,0 +1,546 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+/*
+ * IPQ9574 AL02-C17 board device tree source
+ *
+ * Copyright (c) 2020-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ */
+
+/dts-v1/;
+
+#include "ipq9574-al02-c6.dts"
+
+/ {
+	#address-cells = <0x2>;
+	#size-cells = <0x2>;
+	model = "Qualcomm Technologies, Inc. IPQ9574/AP-AL02-C17";
+	compatible = "qcom,ipq9574-ap-al02-c17", "qcom,ipq9574-al02", "qcom,ipq9574";
+
+	interrupt-parent = <&intc>;
+
+	/*	Default profile 1 * York + 2 * Wikiki
+	 * +=========+==============+========================+
+	 * |        |              |                         |
+	 * | Region | Start Offset |          Size           |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * |        |              |                         |
+	 * |        |              |                         |
+	 * |        |              |                         |
+	 * | Linux  |  0x42000000  |         123MB           |
+	 * |        |              |                         |
+	 * |        |              |                         |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * |        |              |                         |
+	 * | TZ App |  0x49B00000  |           6MB           |
+	 * |        |              |                         |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * | uboot  |  0x4A100000  |           4MB           |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |  SBL   |  0x4A500000  |           1MB           |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * | TZ+HYP |  0x4A600000  |           4MB           |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |  smem  |  0x4AA00000  |           1MB           |
+	 * +--------+--------------+-------------------------+
+	 * | Q6 Code|              |                         |
+	 * | /data  |  0x4AB00000  |           21MB          |
+	 * +--------+--------------+-------------------------+
+	 * | IPQ9574|              |                         |
+	 * | data   |  0x4C000000  |           14MB          |
+	 * +--------+--------------+-------------------------+
+	 * | IPQ9574|              |                         |
+	 * | M3 dump|  0x4CE00000  |           1MB           |
+	 * +--------+--------------+-------------------------+
+	 * | IPQ9574|              |                         |
+	 * | QDSS   |  0x4CF00000  |           1MB           |
+	 * +--------+--------------+-------------------------+
+	 * | IPQ9574|              |                         |
+	 * | caldb  |  0x4D000000  |           5MB           |
+	 * +--------+--------------+-------------------------+
+	 * | QCN9160|              |                         |
+	 * | data   |  0x4D500000  |           14MB          |
+	 * +--------+--------------+-------------------------+
+	 * | QCN9160|              |                         |
+	 * | M3 data|  0x4E300000  |           1MB           |
+	 * +--------+--------------+-------------------------+
+	 * | QCN9160|              |                         |
+	 * | QDSS   |  0x4E400000  |           1MB           |
+	 * +--------+--------------+-------------------------+
+	 * | QCN9160|              |                         |
+	 * | caldb  |  0x4E500000  |           5MB           |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * |  Wkk0  |  0x4EA00000  |          50MB           |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * |  Wkk1  |  0x51C00000  |          50MB           |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * |  MHI0  |   DYNAMIC    |          15MB           |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * |  MHI1  |   DYNAMIC    |          15MB           |
+	 * |        |              |                         |
+	 * +--------+--------------+-------------------------+
+	 * |        |              |                         |
+	 * |  MLO   |   DYNAMIC    |          12MB           |
+	 * |        |              |                         |
+	 * +=================================================+
+	 * |                                                 |
+	 * |                                                 |
+	 * |                                                 |
+	 * |            Rest of memory for Linux             |
+	 * |                                                 |
+	 * |                                                 |
+	 * |                                                 |
+	 * +=================================================+
+	 */
+
+	reserved-memory {
+		wcss_data_pd1: q6_data@4c000000 {
+			no-map;
+			reg = <0x0 0x4c000000 0x0 0xe00000>;
+		};
+
+		wcss_data_pd2: q6_data2@4d500000 {
+			no-map;
+			reg = <0x0 0x4d500000 0x0 0xe00000>;
+		};
+
+		m3_dump_pd2: m3_dump2@4e300000 {
+			no-map;
+			reg = <0x0 0x4e300000 0x0 0x100000>;
+		};
+
+		etr_pd2: q6_etr2@4e400000 {
+			no-map;
+			reg = <0x0 0x4e400000 0x0 0x100000>;
+		};
+
+		caldb_pd2: caldb2@4e500000 {
+			no-map;
+			reg = <0x0 0x4e500000 0x0 0x500000>;
+		};
+	};
+
+	soc {
+		pcie1_x1: pci@10000000 {
+			status = "disabled";
+			/delete-node/ pcie1_rp;
+			pcie1_rp {
+				reg = <0 0 0 0 0>;
+			};
+		};
+
+		pcie1_phy: phy@fc000 {
+			status = "disabled";
+		};
+
+		pcie2_x2: pci@20000000 {
+			/delete-node/ pcie2_rp;
+			pcie2_rp {
+				reg = <0 0 0 0 0>;
+
+				wifi@2 {
+					reg = <0 0 0 0 0>;
+
+					boot-args = <0x2 0x4 0x34 0x3 0x0 0x0     /* MX Rail, GPIO52, Drive strength 0x3 */
+							0x4 0x4 0x18 0x3 0x0 0x0  /* RFA1p2 Rail, GPIO24, Drive strength 0x3 */
+							0x0 0x4 0x0 0x0 0x0 0x0>; /* End of arguments */
+					license-file = "";
+#if defined(__CNSS2__)
+					qrtr_node_id = <0x32>;
+					memory-region = <0>,<&mhi_region0>;
+#endif
+				};
+			};
+		};
+
+		pcie3_x2: pci@18000000 {
+			/delete-node/ pcie3_rp;
+			pcie3_rp {
+				reg = <0 0 0 0 0>;
+
+				wifi@3 {
+					reg = <0 0 0 0 0>;
+
+					boot-args = <0x2 0x4 0x34 0x3 0x0 0x0     /* MX Rail, GPIO52, Drive strength 0x3 */
+							0x4 0x4 0x18 0x3 0x0 0x0  /* RFA1p2 Rail, GPIO24, Drive strength 0x3 */
+							0x0 0x4 0x0 0x0 0x0 0x0>; /* End of arguments */
+					license-file = "";
+#if defined(__CNSS2__)
+					qrtr_node_id = <0x33>;
+					memory-region = <0>,<&mhi_region1>;
+#endif
+				};
+			};
+		};
+	};
+};
+
+&wifi0 {
+	/* Enable IPQ9574 integratd 2G Radio */
+	led-gpio = <&tlmm 64 1>;
+	status = "ok";
+};
+
+&wifi3 {
+	/* QCN9224 2G on PCI1 is disabled for AL02-C6 */
+	/delete-property/ hremote_node;
+	status = "disabled";
+};
+
+&wifi4 {
+#if !defined(__IPQ_MEM_PROFILE_256_MB__)
+#ifdef __IPQ_MEM_PROFILE_512_MB__
+	/* qcn9224 tgt-mem-mode=1 layout - 38MB
+	 * +=========+==============+=========+
+	 * |  Region | Start Offset |   Size  |
+	 * +---------+--------------+---------+
+	 * | HREMOTE |  0x4DD00000  |   20MB  |
+	 * +---------+--------------+---------+
+	 * | M3 Dump |  0x4F100000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |   ETR   |  0x4F200000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |  Caldb  |  0x4F300000  |   8MB   |
+	 * +==================================+
+	 */
+	base-addr = <0x4DD00000>;
+	m3-dump-addr = <0x4F100000>;
+	etr-addr = <0x4F200000>;
+	caldb-addr = <0x4F300000>;
+	hremote-size = <0x1400000>;
+	tgt-mem-mode = <0x1>;
+#else
+	/* qcn9224 tgt-mem-mode=0 layout - 46MB
+	 * +=========+==============+=========+
+	 * |  Region | Start Offset |   Size  |
+	 * +---------+--------------+---------+
+	 * | HREMOTE |  0x4DD00000  |   36MB  |
+	 * +---------+--------------+---------+
+	 * | M3 Dump |  0x50100000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |   ETR   |  0x50200000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |  Caldb  |  0x50300000  |   8MB   |
+	 * +==================================+
+	 */
+	base-addr = <0x4DD00000>;
+	m3-dump-addr = <0x50100000>;
+	etr-addr = <0x50200000>;
+	caldb-addr = <0x50300000>;
+	hremote-size = <0x2400000>;
+	tgt-mem-mode = <0x0>;
+#endif
+	qrtr_node_id = <0x32>;
+	hremote_node = <&qcn9224_pcie0>;
+	caldb-size = <0x800000>;
+	board_id = <0x04>;
+	status = "ok";
+#endif
+};
+
+&wifi5 {
+#if !defined(__IPQ_MEM_PROFILE_256_MB__)
+#ifdef __IPQ_MEM_PROFILE_512_MB__
+	/* qcn9224 tgt-mem-mode=1 layout - 38MB
+	 * +=========+==============+=========+
+	 * |  Region | Start Offset |   Size  |
+	 * +---------+--------------+---------+
+	 * | HREMOTE |  0x50300000  |   20MB  |
+	 * +---------+--------------+---------+
+	 * | M3 Dump |  0x51700000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |   ETR   |  0x51800000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |  Caldb  |  0x51900000  |   8MB   |
+	 * +==================================+
+	 */
+	base-addr = <0x50300000>;
+	m3-dump-addr = <0x51700000>;
+	etr-addr = <0x51800000>;
+	caldb-addr = <0x51900000>;
+	hremote-size = <0x1400000>;
+	tgt-mem-mode = <0x1>;
+#else
+	/* qcn9224 tgt-mem-mode=0 layout - 46MB
+	 * +=========+==============+=========+
+	 * |  Region | Start Offset |   Size  |
+	 * +---------+--------------+---------+
+	 * | HREMOTE |  0x50B00000  |   36MB  |
+	 * +---------+--------------+---------+
+	 * | M3 Dump |  0x52F00000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |   ETR   |  0x53000000  |   1MB   |
+	 * +---------+--------------+---------+
+	 * |  Caldb  |  0x53100000  |   8MB   |
+	 * +==================================+
+	 */
+	base-addr = <0x50B00000>;
+	m3-dump-addr = <0x52F00000>;
+	etr-addr = <0x53000000>;
+	caldb-addr = <0x53100000>;
+	hremote-size = <0x2400000>;
+	tgt-mem-mode = <0x0>;
+#endif
+	qrtr_node_id = <0x33>;
+	hremote_node = <&qcn9224_pcie1>;
+	caldb-size = <0x800000>;
+	board_id = <0x02>;
+	status = "ok";
+#endif
+};
+
+&q6_region {
+	status = "ok";
+};
+
+&q6_etr_region {
+	status = "ok";
+};
+
+&q6v5_wcss {
+	compatible = "qcom,ipq9574-q6-mpd";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	reg = <0x0cd00000 0x4040>,
+	      <0xCB50000 0x8>,
+	      <0x4ab000 0x20>;
+
+	reg-names = "qdsp6",
+		    "wcmn",
+		    "rmb";
+	ranges;
+	firmware = "IPQ9574/q6_fw.mdt";
+
+	resets = <&gcc GCC_WCSSAON_RESET>,
+		 <&gcc GCC_WCSS_Q6_BCR>;
+
+	reset-names = "wcss_aon_reset",
+		      "wcss_q6_reset";
+
+	clocks = <&gcc GCC_ANOC_WCSS_AXI_M_CLK>,
+		 <&gcc GCC_Q6_AXIM_CLK>,
+		 <&gcc GCC_Q6_AHB_CLK>,
+		 <&gcc GCC_Q6_AHB_S_CLK>,
+		 <&gcc GCC_Q6SS_BOOT_CLK>,
+		 <&gcc GCC_WCSS_ECAHB_CLK>,
+		 <&gcc GCC_WCSS_ACMT_CLK>,
+		 <&gcc GCC_MEM_NOC_Q6_AXI_CLK>,
+		 <&gcc GCC_WCSS_Q6_TBU_CLK>,
+		 <&gcc GCC_SYS_NOC_WCSS_AHB_CLK>,
+		 <&gcc GCC_Q6_AXIM2_CLK>,
+		 <&gcc GCC_WCSS_AHB_S_CLK>,
+		 <&gcc GCC_WCSS_AXI_M_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_APB_BDG_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_ATB_BDG_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_DAPBUS_BDG_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_NTS_BDG_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_APB_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_ATB_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_DAPBUS_CLK>,
+		 <&gcc GCC_WCSS_DBG_IFC_NTS_CLK>,
+		 <&gcc GCC_Q6_TSCTR_1TO2_CLK>,
+		 <&gcc GCC_Q6SS_ATBM_CLK>,
+		 <&gcc GCC_Q6SS_PCLKDBG_CLK>,
+		 <&gcc GCC_Q6SS_TRIG_CLK>;
+
+	clock-names = "anoc_wcss_axi_m",
+		      "q6_axim",
+		      "q6_ahb",
+		      "q6_ahb_s",
+		      "q6ss_boot",
+		      "wcss_ecahb",
+		      "wcss_acmt",
+		      "mem_noc_q6_axi",
+		      "wcss_q6_tbu",
+		      "sys_noc_wcss_ahb",
+		      "q6_axim2",
+		      "wcss_ahb_s",
+		      "wcss_axi_m",
+		      "dbg-apb-bdg",
+		      "dbg-atb-bdg",
+		      "dbg-dapbus-bdg",
+		      "dbg-nts-bdg",
+		      "dbg-apb",
+		      "dbg-atb",
+		      "dbg-dapbus",
+		      "dbg-nts",
+		      "q6_tsctr_1to2_clk",
+		      "q6ss_atbm_clk",
+		      "q6ss_pclkdbg_clk",
+		      "q6ss_trig_clk";
+
+	assigned-clocks = <&gcc GCC_ANOC_WCSS_AXI_M_CLK>,
+			  <&gcc GCC_Q6_AXIM_CLK>,
+			  <&gcc GCC_Q6_AHB_CLK>,
+			  <&gcc GCC_Q6_AHB_S_CLK>,
+			  <&gcc GCC_Q6SS_BOOT_CLK>,
+			  <&gcc GCC_WCSS_ECAHB_CLK>,
+			  <&gcc GCC_MEM_NOC_Q6_AXI_CLK>,
+			  <&gcc GCC_WCSS_Q6_TBU_CLK>,
+			  <&gcc GCC_SYS_NOC_WCSS_AHB_CLK>,
+			  <&gcc GCC_Q6_AXIM2_CLK>,
+			  <&gcc GCC_WCSS_AHB_S_CLK>,
+			  <&gcc GCC_WCSS_AXI_M_CLK>;
+
+	assigned-clock-rates = <266666667>,
+				<533000000>,
+				<133333333>,
+				<133333333>,
+				<342857143>,
+				<133333333>,
+				<133333333>,
+				<533000000>,
+				<533000000>,
+				<133333333>,
+				<342857143>,
+				<133333333>,
+				<266666667>;
+
+	memory-region = <&q6_region>, <&q6_etr_region>;
+
+	qcom,rproc = <&q6v5_wcss>;
+	qcom,bootargs_smem = <507>;
+	boot-args = <0x1 0x4 0x3 0x0F 0x0 0x0>,
+		    <0x2 0x4 0x2 0x1B 0x0 0x0>;
+	status = "ok";
+	q6_wcss_pd1: remoteproc_pd1@4ab000 {
+		compatible = "qcom,ipq9574-wcss-ahb-mpd";
+		reg = <0x4ab000 0x20>;
+		reg-names = "rmb";
+		firmware = "IPQ9574/q6_fw.mdt";
+		m3_firmware = "IPQ9574/m3_fw.mdt";
+		interrupts-extended = <&wcss_smp2p_in 8 0>,
+				      <&wcss_smp2p_in 9 0>,
+				      <&wcss_smp2p_in 12 0>,
+				      <&wcss_smp2p_in 11 0>;
+		interrupt-names = "fatal",
+				  "ready",
+				  "spawn-ack",
+				  "stop-ack";
+
+		resets = <&gcc GCC_WCSSAON_RESET>,
+			 <&gcc GCC_WCSS_BCR>;
+
+		reset-names = "wcss_aon_reset",
+			      "wcss_reset";
+
+		clocks = <&gcc GCC_Q6_AXIM2_CLK>,
+			 <&gcc GCC_WCSS_AHB_S_CLK>,
+			 <&gcc GCC_WCSS_AXI_M_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_APB_BDG_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_ATB_BDG_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_DAPBUS_BDG_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_NTS_BDG_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_APB_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_ATB_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_DAPBUS_CLK>,
+			 <&gcc GCC_WCSS_DBG_IFC_NTS_CLK>,
+			 <&gcc GCC_Q6_TSCTR_1TO2_CLK>,
+			 <&gcc GCC_Q6SS_ATBM_CLK>,
+			 <&gcc GCC_Q6SS_PCLKDBG_CLK>,
+			 <&gcc GCC_Q6SS_TRIG_CLK>;
+
+		clock-names = "q6_axim2",
+			      "wcss_ahb_s",
+			      "wcss_axi_m",
+			      "dbg-apb-bdg",
+			      "dbg-atb-bdg",
+			      "dbg-dapbus-bdg",
+			      "dbg-nts-bdg",
+			      "dbg-apb",
+			      "dbg-atb",
+			      "dbg-dapbus",
+			      "dbg-nts",
+			      "q6_tsctr_1to2_clk",
+			      "q6ss_atbm_clk",
+			      "q6ss_pclkdbg_clk",
+			      "q6ss_trig_clk";
+
+		assigned-clocks = <&gcc GCC_Q6_AXIM2_CLK>,
+				  <&gcc GCC_WCSS_AHB_S_CLK>,
+				  <&gcc GCC_WCSS_AXI_M_CLK>;
+
+		assigned-clock-rates = <342857143>,
+				       <133333333>,
+				       <266666667>;
+
+		qcom,halt-regs = <&tcsr_q6_block 0xa000 0xd000 0x0>;
+
+		qcom,smem-states = <&wcss_smp2p_out 8>,
+				   <&wcss_smp2p_out 9>,
+				   <&wcss_smp2p_out 10>;
+		qcom,smem-state-names = "shutdown",
+					"stop",
+					"spawn";
+		memory-region = <&wcss_data_pd1>, <&m3_dump>,
+				<&q6_etr_region>;
+	};
+
+	q6_wcss_pd2: remoteproc_pd2 {
+		compatible = "qcom,ipq9574-wcss-pcie-mpd";
+		firmware = "IPQ9574/q6_fw.mdt";
+		m3_firmware = "qcn9160/m3_fw.mdt";
+		interrupts-extended = <&wcss_smp2p_in 16 0>,
+				      <&wcss_smp2p_in 17 0>,
+				      <&wcss_smp2p_in 20 0>,
+				      <&wcss_smp2p_in 19 0>;
+		interrupt-names = "fatal",
+				  "ready",
+				  "spawn-ack",
+				  "stop-ack";
+
+		qcom,smem-states = <&wcss_smp2p_out 16>,
+				   <&wcss_smp2p_out 17>,
+				   <&wcss_smp2p_out 18>;
+		qcom,smem-state-names = "shutdown",
+					"stop",
+					"spawn";
+		memory-region = <&wcss_data_pd2>, <&m3_dump_pd2>,
+				<&etr_pd2>;
+	};
+};
+
+&q6_region {
+	reg = <0x0 0x4ab00000 0x0 0x01500000>;
+	status = "ok";
+};
+
+&m3_dump {
+	reg = <0x0 0x4ce00000 0x0 0x00100000>;
+	status = "ok";
+};
+
+&q6_etr_region {
+	reg = <0x0 0x4cf00000 0x0 0x00100000>;
+	status = "ok";
+};
+
+&q6_caldb_region {
+	reg = <0x0 0x4d000000 0x0 0x00500000>;
+	status = "ok";
+};
+
+&qcn9224_pcie2 {
+	reg = <0x0 0x4ea00000 0x0 0x03200000>;
+	status = "ok";
+};
+
+&qcn9224_pcie3 {
+	reg = <0x0 0x51c00000 0x0 0x03200000>;
+	status = "ok";
+};

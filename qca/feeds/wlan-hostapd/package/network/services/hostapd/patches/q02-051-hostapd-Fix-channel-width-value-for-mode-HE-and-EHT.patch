@@ -1,0 +1,114 @@
+From 57e2bfb519e31bb1ce371e700407479a6313627e Mon Sep 17 00:00:00 2001
+From: Sidhanta Sahu <quic_sidhanta@quicinc.com>
+Date: Tue, 18 Oct 2022 16:25:07 -0700
+Subject: [PATCH] hostapd: Fix channel width value for mode HE, and EHT.
+
+Channel width value is different for different modes like VHT, HE, EHT.
+In 6 GHz, the channel width in the wide bandwidth channel switch element
+is based on the HE and EHT operation element. Channel width value will
+be included in wide bandwidth channel switch element accordingly.
+
+Reference: IEEE P802.11be/D2.1.1, August 2022
+	   IEEE P802.11ax/D8.0, October 2020
+
+Signed-off-by: Sidhanta Sahu <quic_sidhanta@quicinc.com>
+---
+ src/ap/ieee802_11.c | 73 ++++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 63 insertions(+), 10 deletions(-)
+
+diff --git a/src/ap/ieee802_11.c b/src/ap/ieee802_11.c
+index a905461..ba1ff10 100644
+--- a/src/ap/ieee802_11.c
++++ b/src/ap/ieee802_11.c
+@@ -7291,17 +7291,9 @@ u8 * hostapd_eid_txpower_envelope(struct hostapd_data *hapd, u8 *eid)
+ 				    tx_pwr);
+ }
+ 
+-
+-u8 * hostapd_eid_wb_chsw_wrapper(struct hostapd_data *hapd, u8 *eid)
++static int hostapd_eid_get_ch_width_vht(const struct hostapd_data *hapd)
+ {
+-	u8 bw, chan1, chan2 = 0;
+-	int freq1;
+-
+-	if (!hapd->cs_freq_params.channel ||
+-	    (!hapd->cs_freq_params.vht_enabled &&
+-	     !hapd->cs_freq_params.he_enabled &&
+-	     !hapd->cs_freq_params.eht_enabled))
+-		return eid;
++	int bw = -1;
+ 
+ 	/* bandwidth: 0: 40, 1: 80, 2: 160, 3: 80+80 */
+ 	switch (hapd->cs_freq_params.bandwidth) {
+@@ -7320,7 +7312,68 @@ u8 * hostapd_eid_wb_chsw_wrapper(struct hostapd_data *hapd, u8 *eid)
+ 		break;
+ 	default:
+ 		/* not valid VHT bandwidth or not in CSA */
++		wpa_printf(MSG_ERROR, "Invalid bandwidth %d in VHT mode.",
++						hapd->cs_freq_params.bandwidth);
++	}
++
++	return bw;
++}
++
++static int hostapd_eid_get_ch_width_he_eht(const struct hostapd_data *hapd)
++{
++	int bw = -1;
++
++	/* bandwidth: 1:40, 2:80, 3:160, 3:80+80(in HE), 4:320 */
++	switch (hapd->cs_freq_params.bandwidth) {
++	case 40:
++		bw = 1;
++		break;
++	case 80:
++		/* check if it's 80+80 in HE only*/
++		if (!hapd->cs_freq_params.center_freq2)
++			bw = 2;
++		else
++			bw = 3;
++		break;
++	case 160:
++		bw = 3;
++		break;
++	case 320:
++		bw = 4;
++		break;
++	default:
++		/* not valid HE/EHT bandwidth or not in CSA */
++		wpa_printf(MSG_ERROR, "Invalid bandwidth %d in HE/EHT mode.",
++						hapd->cs_freq_params.bandwidth);
++	}
++
++	return bw;
++}
++
++u8 *hostapd_eid_wb_chsw_wrapper(struct hostapd_data *hapd, u8 *eid)
++{
++	int bw = 0;
++	u8 chan1, chan2 = 0;
++	int freq1;
++
++	if (!hapd->cs_freq_params.channel ||
++	    (!hapd->cs_freq_params.vht_enabled &&
++	     !hapd->cs_freq_params.he_enabled &&
++	     !hapd->cs_freq_params.eht_enabled))
+ 		return eid;
++
++	if (hapd->cs_freq_params.vht_enabled) {
++		bw = hostapd_eid_get_ch_width_vht(hapd);
++		if (bw < 0)
++			return eid;
++	}
++
++	if (is_6ghz_freq(hapd->cs_freq_params.freq) &&
++			   (hapd->cs_freq_params.he_enabled ||
++				hapd->cs_freq_params.eht_enabled)) {
++		bw = hostapd_eid_get_ch_width_he_eht(hapd);
++		if (bw < 0)
++			return eid;
+ 	}
+ 
+ 	freq1 = hapd->cs_freq_params.center_freq1 ?
+-- 
+2.17.1
+

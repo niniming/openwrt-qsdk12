@@ -1,0 +1,137 @@
+From 2676762acf8a4480174e23df52a3b397986e5e4f Mon Sep 17 00:00:00 2001
+From: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
+Date: Wed, 21 Dec 2022 15:44:18 +0530
+Subject: [PATCH] ath12k: handle mac op scan with link id
+
+Currently the hw scan will not be done based on link id, enabling the hw
+scan based on link id specific.
+
+The link id is decided based on the scan freq, and the arvif is created
+and stored based on the link_id in ahvif
+
+Signed-off-by: Karthikeyan Kathirvel <quic_kathirve@quicinc.com>
+---
+ drivers/net/wireless/ath/ath12k/core.h |  6 ++++
+ drivers/net/wireless/ath/ath12k/mac.c  | 47 ++++++++++++++++++++++++--
+ 2 files changed, 50 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/wireless/ath/ath12k/core.h b/drivers/net/wireless/ath/ath12k/core.h
+index 6d12cc569d15..5f7a020d422a 100644
+--- a/drivers/net/wireless/ath/ath12k/core.h
++++ b/drivers/net/wireless/ath/ath12k/core.h
+@@ -713,6 +713,11 @@ enum ath12k_fw_recovery_option {
+ 	 ATH12K_FW_RECOVERY_ENABLE_SSR_ONLY,
+ };
+ 
++struct ath12k_chan_info {
++	u32 low_freq;
++	u32 high_freq;
++};
++
+ #define ATH12K_FLUSH_TIMEOUT (5 * HZ)
+ #define ATH12K_VDEV_DELETE_TIMEOUT_HZ (5 * HZ)
+ 
+@@ -723,6 +728,7 @@ struct ath12k {
+ 	struct ath12k_pdev_wmi *wmi;
+ 	struct ath12k_pdev_dp dp;
+ 	u8 mac_addr[ETH_ALEN];
++	struct ath12k_chan_info chan_info;
+ 	u32 ht_cap_info;
+ 	u32 vht_cap_info;
+ 	struct ath12k_he ar_he;
+diff --git a/drivers/net/wireless/ath/ath12k/mac.c b/drivers/net/wireless/ath/ath12k/mac.c
+index a81586045911..cb08dfc08df6 100644
+--- a/drivers/net/wireless/ath/ath12k/mac.c
++++ b/drivers/net/wireless/ath/ath12k/mac.c
+@@ -4472,6 +4472,33 @@ static int ath12k_mac_vdev_delete(struct ath12k *ar, struct ath12k_link_vif *arv
+ 	return ret;
+ }
+ 
++static int
++ath12k_mac_find_link_id_by_freq(struct ieee80211_vif *vif, struct ath12k *ar, u32 freq)
++{
++	struct ath12k_vif *ahvif = (void *)vif->drv_priv;
++	u16 link_id;
++
++	lockdep_assert_held(&ahvif->ah->conf_mutex);
++
++	if (!vif->valid_links)
++		return 0;
++
++	for (link_id = 0; link_id < IEEE80211_MLD_MAX_NUM_LINKS; link_id++) {
++		if (!(ahvif->links_map & BIT(link_id)) ||
++		    !ahvif->link[link_id]->ar)
++			continue;
++		if (freq >= ahvif->link[link_id]->ar->chan_info.low_freq &&
++		    freq <= ahvif->link[link_id]->ar->chan_info.high_freq)
++			return link_id;
++	}
++
++	/*
++	 * Valid ML case when channel is not assigned to any of the links
++	 * so link id 0 can be used
++	 */
++	return 0;
++}
++
+ static struct ath12k_link_vif *
+ ath12k_mac_assign_link_vif( struct ath12k_hw *ah, struct ieee80211_vif *vif, u8 link_id)
+ {
+@@ -4736,7 +4763,7 @@ static int ath12k_mac_op_hw_scan(struct ieee80211_hw *hw,
+ 	struct ath12k *ar;
+ 	struct scan_req_params arg;
+ 	int ret = 0;
+-	int i;
++	int i, link_id;
+ 	bool create = true;
+ 
+ 	mutex_lock(&ah->conf_mutex);
+@@ -4751,8 +4778,10 @@ static int ath12k_mac_op_hw_scan(struct ieee80211_hw *hw,
+ 		return -EINVAL;
+ 	}
+ 
+-	/* TODO ML vif handling */
+-	arvif = ath12k_mac_assign_link_vif(ah, vif, 0);  
++	link_id = ath12k_mac_find_link_id_by_freq(vif, ar,
++						  hw_req->req.channels[0]->center_freq);
++
++	arvif = ath12k_mac_assign_link_vif(ah, vif, link_id);
+ 	/* If the vif is already assigned to a specific vdev of an ar,
+ 	 * check whether its already started, vdev which is started
+ 	 * are not allowed to switch to a new radio.
+@@ -12925,6 +12954,10 @@ static int ath12k_mac_setup_channels_rates(struct ath12k *ar,
+ 					     ab->reg_freq_2g.end_freq));
+ 
+ 		ah->supported_band_mask |= BIT(NL80211_BAND_2GHZ);
++		ar->chan_info.low_freq = max(temp_reg_cap->low_2ghz_chan,
++					     ab->reg_freq_2g.start_freq);
++		ar->chan_info.high_freq = min(temp_reg_cap->high_2ghz_chan,
++					      ab->reg_freq_2g.end_freq);
+ 	}
+ 
+ 	if (supported_bands & WMI_HOST_WLAN_5G_CAP) {
+@@ -12965,6 +12998,10 @@ static int ath12k_mac_setup_channels_rates(struct ath12k *ar,
+ 
+ 			ath12k_mac_update_5_9_ch_list(ar, band);
+ 
++		ar->chan_info.low_freq = max(temp_reg_cap->low_5ghz_chan,
++					     ab->reg_freq_5g.start_freq);
++		ar->chan_info.high_freq = min(temp_reg_cap->high_5ghz_chan,
++					      ab->reg_freq_5g.end_freq);
+ 			ah->supported_band_mask |= BIT(NL80211_BAND_5GHZ);
+ 		} else if (reg_cap->low_5ghz_chan >= ATH12K_MIN_6G_FREQ &&
+                            reg_cap->high_5ghz_chan <= ATH12K_MAX_6G_FREQ) {
+@@ -13017,6 +13054,10 @@ static int ath12k_mac_setup_channels_rates(struct ath12k *ar,
+                        band->channels = band->chan_6g[0]->channels;
+ 
+ 			ah->supported_band_mask |= BIT(NL80211_BAND_6GHZ);
++		ar->chan_info.low_freq = max(temp_reg_cap->low_5ghz_chan,
++					     ab->reg_freq_6g.start_freq);
++		ar->chan_info.high_freq = min(temp_reg_cap->high_5ghz_chan,
++					      ab->reg_freq_6g.end_freq);
+ 		}
+ 	}
+ 
+-- 
+2.38.0
+

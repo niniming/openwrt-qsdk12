@@ -1,0 +1,216 @@
+From b8bb10ac3fc9bad53d00bee2e9780263035274da Mon Sep 17 00:00:00 2001
+From: Aditya Kumar Singh <quic_adisi@quicinc.com>
+Date: Wed, 21 Dec 2022 19:21:55 +0530
+Subject: [PATCH] hostapd: add channel switch support with MLO
+
+During channel switch, if its a multi-link operation, there is a requirement
+to send link_id on which channel switch should take place. Also, once channel
+switch is completed, the partner RNR IE should be updated with the new channel
+configuration in the impacted link.
+
+Add support for the above and hence enable channel switch with MLO.
+
+Signed-off-by: Aditya Kumar Singh <quic_adisi@quicinc.com>
+---
+ src/ap/drv_callbacks.c             | 21 +++++++++++++
+ src/drivers/driver_nl80211.c       | 23 +++++++++++++++
+ src/drivers/driver_nl80211.h       |  2 ++
+ src/drivers/driver_nl80211_event.c | 47 +++++++++++++++++++++++++-----
+ 4 files changed, 85 insertions(+), 8 deletions(-)
+
+--- a/src/ap/drv_callbacks.c
++++ b/src/ap/drv_callbacks.c
+@@ -888,6 +888,10 @@ void hostapd_event_ch_switch(struct host
+ 	int channel, chwidth, is_dfs;
+ 	u8 seg0_idx = 0, seg1_idx = 0, op_class;
+ 	size_t i;
++#ifdef CONFIG_IEEE80211BE
++	struct hostapd_mld *mld;
++	struct hostapd_data *link_bss;
++#endif
+ 
+ 	hostapd_logger(hapd, NULL, HOSTAPD_MODULE_IEEE80211,
+ 		       HOSTAPD_LEVEL_INFO,
+@@ -1030,6 +1034,23 @@ void hostapd_event_ch_switch(struct host
+ 
+ 		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_CSA_FINISHED
+ 			"freq=%d dfs=%d", freq, is_dfs);
++
++#ifdef CONFIG_IEEE80211BE
++		/* need to update RNR of partner links in case of MLO */
++		mld = hapd->mld;
++		if (mld) {
++			link_bss = mld->bss;
++			while (link_bss) {
++				/* no need for impacted link */
++				if (link_bss == hapd) {
++					link_bss = link_bss->nbss;
++					continue;
++				}
++				ieee802_11_set_beacon(link_bss);
++				link_bss = link_bss->nbss;
++			}
++		}
++#endif
+ 	} else if (hapd->iface->drv_flags & WPA_DRIVER_FLAGS_DFS_OFFLOAD) {
+ 		wpa_msg(hapd->msg_ctx, MSG_INFO, AP_CSA_FINISHED
+ 			"freq=%d dfs=%d", freq, is_dfs);
+--- a/src/drivers/driver_nl80211.c
++++ b/src/drivers/driver_nl80211.c
+@@ -259,6 +259,39 @@ struct i802_bss * get_bss_ifindex(struct
+ 	return NULL;
+ }
+ 
++struct i802_bss * get_link_bss_ifindex(struct wpa_driver_nl80211_data *drv,
++				       int ifindex, u8 link_id)
++{
++	struct i802_bss *bss, *start_link_bss, *next_link_bss;
++
++	for (bss = drv->first_bss; bss; bss = bss->next) {
++		if (bss->ifindex != ifindex)
++			continue;
++
++		start_link_bss = bss;
++		next_link_bss = bss->next_link_bss;
++
++		if (start_link_bss->drv->mlo_link_id == link_id)
++			return start_link_bss;
++
++		/* should never happen because if only 1 link is
++		 * present, then link_id would have matched above and
++		 * we won't be coming here */
++		if (start_link_bss == next_link_bss) {
++			wpa_printf(MSG_ERROR,
++				   "Single link bss yet link_id did not match");
++			return NULL;
++		}
++
++		while (next_link_bss != start_link_bss) {
++			if (next_link_bss->drv->mlo_link_id == link_id)
++				return next_link_bss;
++			next_link_bss = next_link_bss->next_link_bss;
++		}
++	}
++
++	return NULL;
++}
+ 
+ static int is_mesh_interface(enum nl80211_iftype nlmode)
+ {
+@@ -10894,6 +10927,16 @@ static int nl80211_switch_channel(void *
+ 	if (settings->handle_dfs && nla_put_flag(msg, NL80211_ATTR_HANDLE_DFS))
+ 		goto error;
+ 
++	if (drv->mlo_link_id >= 0) {
++		wpa_printf(MSG_DEBUG, "nl80211: Channel switch request on link_id=%d",
++			   drv->mlo_link_id);
++
++		if (nla_put_u8(msg, NL80211_ATTR_MLO_LINK_ID, drv->mlo_link_id)) {
++			nlmsg_free(msg);
++			return -1;
++		}
++	}
++
+ 	ret = send_and_recv_msgs(drv, msg, NULL, NULL, NULL, NULL);
+ 	if (ret) {
+ 		wpa_printf(MSG_DEBUG, "nl80211: switch_channel failed err=%d (%s)",
+--- a/src/drivers/driver_nl80211.h
++++ b/src/drivers/driver_nl80211.h
+@@ -271,6 +271,8 @@ enum chan_width convert2width(int width)
+ void nl80211_mark_disconnected(struct wpa_driver_nl80211_data *drv);
+ struct i802_bss * get_bss_ifindex(struct wpa_driver_nl80211_data *drv,
+ 				  int ifindex);
++struct i802_bss * get_link_bss_ifindex(struct wpa_driver_nl80211_data *drv,
++				       int ifindex, u8 link_id);
+ int is_ap_interface(enum nl80211_iftype nlmode);
+ int is_sta_interface(enum nl80211_iftype nlmode);
+ int wpa_driver_nl80211_authenticate_retry(struct wpa_driver_nl80211_data *drv);
+--- a/src/drivers/driver_nl80211_event.c
++++ b/src/drivers/driver_nl80211_event.c
+@@ -800,21 +800,50 @@ static void mlme_event_ch_switch(struct
+ 	int ht_enabled = 1;
+ 	int chan_offset = 0;
+ 	int ifidx;
++	u8 link_id = 0;
+ 
+-	wpa_printf(MSG_DEBUG, "nl80211: Channel switch%s event",
+-		   finished ? "" : " started");
++	if (link) {
++		link_id = nla_get_u8(link);
++
++		if (link_id > MAX_NUM_MLD_LINKS) {
++			wpa_printf(MSG_DEBUG,
++				   "nl80211: Ignoring Channel switch%s event on invalid link id (%d)",
++				   finished ? "" : " started", link_id);
++			return;
++		}
++
++		/* not part of MLD still link_id was provided, not accepted */
++		if (!(drv->mlo_link_id >= 0)) {
++			wpa_printf(MSG_DEBUG,
++				   "nl80211: Ignoring Channel switch%s event since MLO is not there still link_id %d was provided",
++				   finished ? "" : " started", link_id);
++			return;
++		}
++	}
++
++	wpa_printf(MSG_DEBUG, "nl80211: Channel switch%s event on link_id %d",
++		   finished ? "" : " started", link_id);
+ 
+ 	if (!freq)
+ 		return;
+ 
+ 	ifidx = nla_get_u32(ifindex);
+-	bss = get_bss_ifindex(drv, ifidx);
++
++	if (link)
++		bss = get_link_bss_ifindex(drv, ifidx, link_id);
++	else
++		bss = get_bss_ifindex(drv, ifidx);
++
+ 	if (bss == NULL) {
+ 		wpa_printf(MSG_WARNING, "nl80211: Unknown ifindex (%d) for channel switch, ignoring",
+ 			   ifidx);
+ 		return;
+ 	}
+ 
++	/* possible that bss is not from the drv we passed. Hence, safe
++	 * to update it now*/
++	drv = bss->drv;
++
+ 	if (type) {
+ 		enum nl80211_channel_type ch_type = nla_get_u32(type);
+ 
+@@ -864,10 +893,7 @@ static void mlme_event_ch_switch(struct
+ 		bss->freq = data.ch_switch.freq;
+ 
+ 	if (link) {
+-		u8 link_id = nla_get_u8(link);
+-
+-		if (link_id < MAX_NUM_MLD_LINKS &&
+-		    drv->sta_mlo_info.valid_links & BIT(link_id)) {
++		if (drv->sta_mlo_info.valid_links & BIT(link_id)) {
+ 			data.ch_switch.link_id = link_id;
+ 			drv->sta_mlo_info.links[link_id].freq =
+ 				data.ch_switch.freq;
+@@ -877,7 +903,7 @@ static void mlme_event_ch_switch(struct
+ 				EVENT_LINK_CH_SWITCH_STARTED, &data);
+ 		}
+ 
+-		if (link_id != drv->mlo_assoc_link_id)
++		if (drv->associated && (link_id != drv->mlo_assoc_link_id))
+ 			return;
+ 	}
+ 
+@@ -3349,6 +3375,11 @@ static bool check_route_global_event(int
+ 	case NL80211_CMD_WIPHY_REG_CHANGE:
+ 		/* These commands are passed to each bss of the MLD */
+ 		return true;
++	case NL80211_CMD_CH_SWITCH_NOTIFY:
++		/* The handler has check to fetch appropriate bss based on the
++		 * link_id passed hence no need to explicitly route this
++		 * event */
++		return false;
+ 	default:
+ 		/* TODO Either handle routing for this command
+ 		 * insider the default bss handler or return
